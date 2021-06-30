@@ -13,7 +13,7 @@ local shots = {
 local on_aim_miss = function(e)
 	if not ui.get(ui_bad_inject) then return end
 
-	if e.reason ~= "death" and e.reason ~= "unregistered shot" then
+	if e.reason ~= 'death' and e.reason ~= 'unregistered shot' and e.reason == '?' then
 		shots.miss = shots.miss + 1
 	end
 
@@ -32,5 +32,5 @@ local on_round_start = function()
 	shots.miss = 0
 end
 
-client.set_event_callback("aim_miss", on_aim_miss)
-client.set_event_callback("round_start", on_round_start)
+client.set_event_callback('aim_miss', on_aim_miss)
+client.set_event_callback('round_start', on_round_start)
