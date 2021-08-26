@@ -1,21 +1,37 @@
+--[[
+    Custom ESP in lua (recode)
+    Credits: halflifefan, Nexxed, and Aviarita. looked at some of their related luas on github to see how some things are done and copied some stuff.
+    Note: Anything commented out will be added later.
+]]
+
+--> Requirements
 local csgo_weapons = require('gamesense/csgo_weapons')
 
+--> Variables
 local tab, container = 'LUA', 'A'
-local label = ui.new_label(tab, container, 'Player ESP in lua')
-local name = ui.new_checkbox(tab, container, 'Name')
-local name_color = ui.new_color_picker(tab, container, 'Name color', 255, 255, 255, 255)
-local box = ui.new_checkbox(tab, container, 'Bounding box')
-local box_color = ui.new_color_picker(tab, container, 'Box color', 255, 255, 255, 255)
-local skeleton = ui.new_checkbox(tab, container, 'Skeleton')
-local skeleton_color = ui.new_color_picker(tab, container, 'Skeleton color', 255, 255, 255, 255)
-local health = ui.new_checkbox(tab, container, 'Health')
-local health_color = ui.new_color_picker(tab, container, 'Health color', 255, 255, 255, 255)
-local distance = ui.new_checkbox(tab, container, 'Distance')
-local distance_color = ui.new_color_picker(tab, container, 'Distance color', 255, 255, 255, 255)
-local weapon = ui.new_checkbox(tab, container, 'Weapon text')
-local weapon_color = ui.new_color_picker(tab, container, 'Weapon color', 255, 255, 255, 255)
 
-local function round(value)
+--> User interface
+local ui_hotkey = ui.new_hotkey(tab, container, 'Activation type', false, 0)
+local ui_teammates = ui.new_checkbox(tab, container, 'Teammates')
+-- local ui_dormant = ui.new_checkbox(tab, container, 'Dormant')
+local ui_bounding_box = ui.new_checkbox(tab, container, 'Bounding box')
+local ui_bounding_box_color = ui.new_color_picker(tab, container, 'Bounding box color', 255, 255, 255, 255)
+local ui_health_bar = ui.new_checkbox(tab, container, 'Health bar')
+local ui_health_bar_color = ui.new_color_picker(tab, container, 'Health bar color', 255, 255, 255, 255)
+local ui_name = ui.new_checkbox(tab, container, 'Name')
+local ui_name_color = ui.new_color_picker(tab, container, 'Name color', 255, 255, 255, 255)
+local ui_flags = ui.new_checkbox(tab, container, 'Flags')
+local ui_flags_color = ui.new_color_picker(tab, container, 'Flags color', 255, 255, 255, 255)
+local ui_weapon_text = ui.new_checkbox(tab, container, 'Weapon text')
+local ui_weapon_text_color = ui.new_color_picker(tab, container, 'Weapon text color', 255, 255, 255, 255)
+local ui_distance = ui.new_checkbox(tab, container, 'Distance')
+local ui_distance_color = ui.new_color_picker(tab, container, 'Distance color', 255, 255, 255, 255)
+-- local ui_skeleton = ui.new_checkbox(tab, container, 'Skeleton')
+-- local ui_skeleton_color = ui.new_color_picker(tab, container, 'Skeleton color', 255, 255, 255, 255)
+
+--> Important functions
+
+local round = function(value)
     return math.floor(value + 0.5)
 end
 
@@ -29,134 +45,115 @@ local vec2_distance = function(x1, y1, z1, x2, y2, z2)
     return math.sqrt((x2-x1)^2 + (y2-y1)^2 + (z2-z1)^2)
 end
 
-local function on_paint()
-    local players = entity.get_players(not enemies_only)
+renderer.bounding_box = function(x, y, w, h, r, g, b, a)
+    renderer.rectangle(x + 1, y, w - 1, 1, r, g, b, a)
+    renderer.rectangle(x + w - 1, y + 1, 1, h - 1, r, g, b, a)
+    renderer.rectangle(x, y + h - 1, w - 1, 1, r, g, b, a)
+    renderer.rectangle(x, y, 1, h - 1, r, g, b, a)
+end
 
-    for i=1,#players do
-        enemy_players = players[i]
+
+--> Main functions
+local on_paint = function()
+    if not ui.get(ui_hotkey) then return end
+
+    -- local dormant = ui.get(ui_dormant)
+    local teammates = ui.get(ui_teammates)
+    local bounding_box = ui.get(ui_bounding_box)
+    local b_r, b_g, b_b, b_a = ui.get(ui_bounding_box_color)
+    local health_bar = ui.get(ui_health_bar)
+    local h_r, h_g, h_b, h_a = ui.get(ui_health_bar_color)
+    local name = ui.get(ui_name)
+    local n_r, n_g, n_b, n_a = ui.get(ui_health_bar_color)
+    local flags = ui.get(ui_flags)
+    local f_r, f_g, f_b, f_a = ui.get(ui_name_color)
+    local weapon_text = ui.get(ui_weapon_text)
+    local w_r, w_g, w_b, w_a = ui.get(ui_flags_color)
+    local distance = ui.get(ui_distance)
+    local d_r, d_g, d_b, d_a = ui.get(ui_distance_color)
+    -- local skeleton = ui.get(ui_skeleton)
+    -- local s_r, s_g, s_b, s_a = ui.get(ui_skeleton_color)
+
+    local players = entity.get_players(not teammates)
+    for k, v in pairs(players) do
+        local enemy_players = players[k]
+        local enemy_dormant = entity.is_dormant(player)
+        local enemy_resource = entity.get_player_resource()
+        local enemy_name = entity.get_player_name(enemy_players)
+        local enemy_health = entity.get_prop(enemy_players, 'm_iHealth')
+        local enemy_vip = entity.get_prop(enemy_players, 'm_iPlayerVIP')
+        local enemy_c4 = entity.get_prop(enemy_players, 'm_iPlayerC4')
+        local enemy_duck = entity.get_prop(enemy_players, 'm_flDuckAmount')
+        local enemy_duckspeed = entity.get_prop(enemy_players, 'm_flDuckSpeed')
+        local enemy_flags_height = 0
+        local bottom_text_height = 0
+
         local x1, y1, x2, y2, a = entity.get_bounding_box(enemy_players)
+        
+        if x1 ~= nil and a > 0 then
 
-        if x1 ~= nil and y1 ~= nil and not entity.is_dormant(enemy_players) then
-            -- Name
-            if ui.get(name) then
-                local enemy_name = entity.get_player_name(enemy_players)
-                local r, g, b, a = ui.get(name_color)
-                renderer.text(x1/2 + x2/2, y1 - 7, r, g, b, a, 'c', nil, enemy_name)
+            if bounding_box then
+                renderer.bounding_box(x1 + 1, y1 + 1, x2 - x1 - 2, y2 - y1 - 2, 0, 0, 0, 155)
+                renderer.bounding_box(x1, y1, x2 - x1, y2 - y1, b_r, b_g, b_b, b_a)
+                renderer.bounding_box(x1 - 1, y1 - 1, x2 - x1 + 2, y2 - y1 + 2, 0, 0, 0, 155)
             end
 
-            -- Bounding box
-            if ui.get(box) then
-                local r, g, b, a = ui.get(box_color)
-                renderer.rectangle(x2 + 1, y1, 1, y2 - y1, r, g, b, a)
-                renderer.rectangle(x2, y1, 1, y2 - y1, 0, 0, 0, a)
-                renderer.rectangle(x2 + 2, y1, 1, y2 - y1, 0, 0, 0, a)
+            if health_bar then
+                local update = y2 - y1 + 2
 
-                renderer.rectangle(x1 + 1, y2, y2/2 - y1/2, 1, r, g, b, a)
-                renderer.rectangle(x1 + 1, y2 - 1, y2/2 - y1/2, 1, 0, 0, 0, a)
-                renderer.rectangle(x1 + 1, y2 + 1, y2/2 - y1/2, 1, 0, 0, 0, a)
-
-                renderer.rectangle(x1 + 1, y1, 1, y2 - y1, r, g, b, a)
-                renderer.rectangle(x1, y1, 1, y2 - y1, 0, 0, 0, a)
-                renderer.rectangle(x1 + 2, y1, 1, y2 - y1, 0, 0, 0, a)
-
-                renderer.rectangle(x1 + 1, y1, y2/2 - y1/2, 1, r, g, b, a)
-                renderer.rectangle(x1 + 1, y1 - 1, y2/2 - y1/2, 1, 0, 0, 0, a)
-                renderer.rectangle(x1 + 1, y1 + 1, y2/2 - y1/2, 1, 0, 0, 0, a)
-            end
-
-            -- Distance
-            if ui.get(skeleton) then
-                local r, g, b, a = ui.get(skeleton_color)
-
-                local enemy_hitbox_head_x, enemy_hitbox_head_y, enemy_hitbox_head_z = entity.hitbox_position(enemy_players, 0)
-                local head_x, head_y = renderer.world_to_screen(enemy_hitbox_head_x, enemy_hitbox_head_y, enemy_hitbox_head_z)
-
-                local enemy_hitbox_neck_x, enemy_hitbox_neck_y, enemy_hitbox_neck_z = entity.hitbox_position(enemy_players, 1)
-                local neck_x, neck_y = renderer.world_to_screen(enemy_hitbox_neck_x, enemy_hitbox_neck_y, enemy_hitbox_neck_z)
-
-                local enemy_hitbox_body_x, enemy_hitbox_body_y, enemy_hitbox_body_z = entity.hitbox_position(enemy_players, 2)
-                local body_x, body_y = renderer.world_to_screen(enemy_hitbox_body_x, enemy_hitbox_body_y, enemy_hitbox_body_z)
-
-                local enemy_hitbox_right_leg_x, enemy_hitbox_right_leg_y, enemy_hitbox_right_leg_z = entity.hitbox_position(enemy_players, 7)
-                local leg_r_x, leg_r_y = renderer.world_to_screen(enemy_hitbox_right_leg_x, enemy_hitbox_right_leg_y, enemy_hitbox_right_leg_z)
-
-                local enemy_hitbox_left_leg_x, enemy_hitbox_left_leg_y, enemy_hitbox_left_leg_z = entity.hitbox_position(enemy_players, 8)
-                local leg_l_x, leg_l_y = renderer.world_to_screen(enemy_hitbox_left_leg_x, enemy_hitbox_left_leg_y, enemy_hitbox_left_leg_z)
-
-                local enemy_hitbox_right_leg_x1, enemy_hitbox_right_leg_y1, enemy_hitbox_right_leg_z1 = entity.hitbox_position(enemy_players, 9)
-                local leg_r_x1, leg_r_y1 = renderer.world_to_screen(enemy_hitbox_right_leg_x1, enemy_hitbox_right_leg_y1, enemy_hitbox_right_leg_z1)
-
-                local enemy_hitbox_left_leg_x1, enemy_hitbox_left_leg_y1, enemy_hitbox_left_leg_z1 = entity.hitbox_position(enemy_players, 10)
-                local leg_l_x1, leg_l_y1 = renderer.world_to_screen(enemy_hitbox_left_leg_x1, enemy_hitbox_left_leg_y1, enemy_hitbox_left_leg_z1)
-
-                local enemy_hitbox_left_arm_x, enemy_hitbox_left_arm_y, enemy_hitbox_left_arm_z = entity.hitbox_position(enemy_players, 17)
-                local arm_l_x, arm_l_y = renderer.world_to_screen(enemy_hitbox_left_arm_x, enemy_hitbox_left_arm_y, enemy_hitbox_left_arm_z)
-
-                local enemy_hitbox_left_arm_x1, enemy_hitbox_left_arm_y1, enemy_hitbox_left_arm_z1 = entity.hitbox_position(enemy_players, 14)
-                local arm_l_x1, arm_l_y1 = renderer.world_to_screen(enemy_hitbox_left_arm_x1, enemy_hitbox_left_arm_y1, enemy_hitbox_left_arm_z1)
-
-                local enemy_hitbox_right_arm_x, enemy_hitbox_right_arm_y, enemy_hitbox_right_arm_z = entity.hitbox_position(enemy_players, 15)
-                local arm_r_x, arm_r_y = renderer.world_to_screen(enemy_hitbox_right_arm_x, enemy_hitbox_right_arm_y, enemy_hitbox_right_arm_z)
-
-                local enemy_hitbox_right_arm_x1, enemy_hitbox_right_arm_y1, enemy_hitbox_right_arm_z1 = entity.hitbox_position(enemy_players, 16)
-                local arm_r_x1, arm_r_y1 = renderer.world_to_screen(enemy_hitbox_right_arm_x1, enemy_hitbox_right_arm_y1, enemy_hitbox_right_arm_z1)
-
-                renderer.line(head_x, head_y, neck_x, neck_y, r, g, b, a)
-                renderer.line(neck_x, neck_y, body_x, body_y, r, g, b, a)
-                renderer.line(body_x, body_y, leg_r_x, leg_r_y, r, g, b, a)
-                renderer.line(body_x, body_y, leg_l_x, leg_l_y, r, g, b, a)
-                renderer.line(neck_x, neck_y, arm_r_x, arm_r_y, r, g, b, a)
-                renderer.line(neck_x, neck_y, arm_l_x, arm_l_y, r, g, b, a)
-                renderer.line(arm_l_x, arm_l_y, arm_l_x1, arm_l_y1, r, g, b, a)
-                renderer.line(arm_r_x, arm_r_y, arm_r_x1, arm_r_y1, r, g, b, a)
-                renderer.line(leg_l_x, leg_l_y, leg_l_x1, leg_l_y1, r, g, b, a)
-                renderer.line(leg_r_x, leg_r_y, leg_r_x1, leg_r_y1, r, g, b, a)
-            end
-            
-            -- Health
-            if ui.get(health) then
-                local enemy_health = entity.get_prop(enemy_players, "m_iHealth")
-                local height = y2 - y1 + 2
-                local y1 = y1 - 1
-                local r, g, b, a = ui.get(health_color)
-
-                renderer.rectangle(x1 - 6, y1, 4, y2 - y1, 0, 0, 0, a/2)
-                renderer.rectangle(x1 - 5, math.ceil(y2-(height*enemy_health/100))+2, 2, math.floor(height*enemy_health/100) - 2, r, g, b, a)
+                renderer.rectangle(x1 - 6, y1 - 1, x2 - x2 + 4, y2 - y1 + 2, 0, 0, 0, 200)
+                renderer.rectangle(x1 - 5, math.floor(y2-(update*enemy_health/100)) + 2, 2, math.floor(update*enemy_health/100) - 2, h_r, h_g, h_b, h_a)
 
                 if enemy_health < 100 then
-                    renderer.text(x1- 5 - 2, y2-(height*enemy_health/100)+2, 255, 255, 255, 255, "-c", 0, enemy_health)
+                    renderer.text(x1 - 7, math.floor(y2-(update*enemy_health/100)) + 2, 255, 255, 255, 255, 'c-', 0, enemy_health)
                 end
             end
 
-            -- Distance
-            if ui.get(distance) then
-                local weapon_ent = entity.get_player_weapon(enemy_players)
-                if weapon_ent == nil then return end
-                local weapon = csgo_weapons(weapon_ent)
-                local r, g, b, a = ui.get(distance_color)
+            if name then
+                renderer.text(x1/2 + x2/2, y1 - 8, n_r, n_g, n_b, n_a, 'c', 0, string.format('%s...', enemy_name:sub(1, 10)))
+            end
+
+            if flags then
+                if enemy_health < 92 then
+                    renderer.text(x2 + 2, y1 + enemy_flags_height, f_r, f_g, f_b, f_a, '-', 0, 'LETHAL')
+                end
+
+                if enemy_c4 then
+                    enemy_flags_height = enemy_flags_height + 10
+                    renderer.text(x2 + 2, y1 + enemy_flags_height, f_r, f_g, f_b, f_a, '-', 0, 'BOMB')
+                end
+
+                if enemy_vip then
+                    enemy_flags_height = enemy_flags_height + 10
+                    renderer.text(x2 + 2, y1 + enemy_flags_height, f_r, f_g, f_b, f_a, '-', 0, 'HOSTAGE')
+                end
+
+                if enemy_duckspeed == 8 and enemy_duck <= 0.9 and enemy_duck > 0.01 then
+                    enemy_flags_height = enemy_flags_height + 10
+                    renderer.text(x2 + 2, y1 + enemy_flags_height, f_r, f_g, f_b, f_a, '-', 0, 'DUCK')
+                end
+            end
+
+            if distance then
+                bottom_text_height = bottom_text_height + 10
 
                 local lx, ly, lz = entity.get_prop(entity.get_local_player(), "m_vecOrigin")
-                local ex, ey, ez = entity.get_prop(players[i], "m_vecOrigin")
-                local unit_distance = vec2_distance(lx, ly, lz, ex, ey, ez)
-                local converted_units = round(units_to_feet(unit_distance))
-
-                renderer.text(x1/2 + x2/2, y2 + 10, r, g, b, a, 'c-', nil, converted_units, 'FT')
+                local ex, ey, ez = entity.get_prop(enemy_players, "m_vecOrigin")
+                local unit = vec2_distance(lx, ly, lz, ex, ey, ez)
+                local converted = round(units_to_feet(unit))
+                
+                renderer.text(x1/2 + x2/2, y2 + 6, d_r, d_g, d_b, d_a, 'c-', 0, string.format('%sFT', converted))
             end
 
-            -- Weapon
-            if ui.get(weapon) then
+            if weapon_text then
+                bottom_text_height = bottom_text_height + 6
+
                 local weapon_ent = entity.get_player_weapon(enemy_players)
                 if weapon_ent == nil then return end
                 local weapon = csgo_weapons(weapon_ent)
-                local r, g, b, a = ui.get(weapon_color)
 
-                if ui.get(distance) then
-                    y2 = y2 + 10
-                end
-
-                renderer.text(x1/2 + x2/2, y2 + 10, r, g, b, a, 'c-', nil, weapon.name)
+                renderer.text(x1/2 + x2/2, y2 + bottom_text_height, w_r, w_g, w_b, w_a, 'c-', 0, string.upper(weapon.name))
             end
-
         end
     end
 end
