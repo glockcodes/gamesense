@@ -23,9 +23,10 @@ local question = ui.new_textbox(tab, container, 'Question')
 
 local button = ui.new_button(tab, container, 'Shake Eight Ball', function()
     local response = answers[math.random(1, 9)]
+    local question = ui.get(question)
 
-    if string.len(ui.get(question)) > 3 then
-        print(string.format('Question: %s, Answer: %s', ui.get(question), response))
+    if string.len(question) > 3 then
+        print(string.format('Question: %s, Answer: %s', question, response))
     else
         print('You must ask the ball a question for a response.')
     end
