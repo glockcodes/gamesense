@@ -42,8 +42,9 @@ local on_paint = function()
         local bomb_origin = vector(entity.get_prop(bomb, 'm_vecOrigin'))
         local bomb_time = entity.get_prop(bomb, 'm_flC4Blow')
         local bomb_time_left = bomb_time - globals.curtime()
+        local bomb_defused = entity.get_prop(bomb, 'm_bBombDefused') == 1
 
-        if bomb_time_left < 0 then
+        if bomb_time_left < 0 or bomb_defused then
             goto skip
         end
 
