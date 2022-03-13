@@ -1,6 +1,11 @@
 local vector = require 'vector'
 
-local contains = function(b,c)for d=1,#b do if b[d]==c then return true end end;return false end
+local contains = function(t, value)
+    for i = 1, #t do
+        if t[i] == value then return true end
+    end
+    return false
+end
 
 local tab, container = 'VISUALS', 'Player ESP'
 local interface = {
@@ -92,8 +97,6 @@ local on_paint = function()
     local options = ui.get(interface.options)
 
     if #enemies == 0 or #options == 0 then return end
-    
-    print('test')
 
     for i, enemy in ipairs(enemies) do
         local box = {entity.get_bounding_box(enemy)} -- [1] = x1, [2] = y1, [3] = x2, [4] = y2, [5] = a
